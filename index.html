@@ -1,0 +1,302 @@
+﻿<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>IK Bot - Mobile Ready com Controles Lado a Lado</title>
+    <style>
+        :root {
+            --bg-dark: #0f172a; --panel-bg: #1e293b; --accent: #ef4444;
+            --path: #334155; --robot-body: #06b6d4; --wall: #f97316;
+            --finish: #10b981; --pause: #3b82f6;
+        }
+
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; outline: none; }
+        
+        /* Bloqueia o zoom e o scroll do corpo para focar no jogo */
+        html, body { 
+            margin: 0; padding: 0; width: 100%; height: 100%;
+            font-family: 'Segoe UI', sans-serif; 
+            background: var(--bg-dark); color: white;
+            display: flex; overflow: hidden; touch-action: none;
+        }
+
+        #app { display: flex; width: 100%; height: 100%; }
+        
+        #sidebar {
+            width: 300px; background: var(--panel-bg);
+            display: flex; flex-direction: column; padding: 15px;
+            gap: 10px; align-items: center;
+            box-shadow: 10px 0 20px rgba(0,0,0,0.5); z-index: 10;
+        }
+
+        .header-panel { text-align: center; width: 100%; }
+        .header-title { margin: 0; color: var(--robot-body); font-size: 1.1rem; }
+        .level-label { background: var(--finish); border-radius: 15px; padding: 2px 10px; font-size: 0.8rem; font-weight: bold; margin: 5px 0; display: inline-block; }
+
+        .info-container { display: flex; justify-content: space-between; width: 100%; gap: 5px; }
+        .info-box { background: #000; padding: 5px; border-radius: 5px; font-size: 0.7rem; text-align: center; flex: 1; border: 1px solid #334155; }
+        
+        .medals-shelf {
+            display: grid; grid-template-columns: repeat(5, 1fr);
+            gap: 4px; background: rgba(0,0,0,0.4); padding: 8px;
+            border-radius: 10px; width: 100%; border: 1px solid #334155;
+        }
+        .medal-icon { font-size: 1.1rem; filter: grayscale(1); opacity: 0.15; transition: 0.5s; text-align: center; }
+        .medal-icon.earned { filter: grayscale(0); opacity: 1; transform: scale(1.1); }
+
+        /* NOVO D-PAD COM 5 COLUNAS PARA INTEGRAR PAUSAR/DESISTIR */
+        .controls-group {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr); /* 5 colunas */
+            grid-template-rows: repeat(3, 48px); /* 3 linhas, mesma altura dos botões */
+            gap: 8px;
+            width: 100%;
+            margin-top: auto; /* Empurra para o final da sidebar no desktop */
+            padding-bottom: 5px;
+        }
+
+        /* Estilos base dos botões */
+        .btn-control, .btn-side {
+            border: none; border-radius: 10px; color: white;
+            cursor: pointer; box-shadow: 0 4px 0 rgba(0,0,0,0.4);
+            display: flex; align-items: center; justify-content: center;
+            font-weight: bold; transition: all 0.1s;
+            height: 100%; /* Ocupa a altura da linha da grade */
+            width: 100%; /* Ocupa a largura da coluna da grade */
+        }
+        .btn-control:active, .btn-side:active { transform: translateY(3px); box-shadow: none; }
+
+        /* Estilo específico das setas de direção */
+        .btn-control { background: #475569; font-size: 1.3rem; }
+        .btn-control:active { background: var(--robot-body); }
+
+        /* Estilo específico dos botões laterais (Pausar/Desistir) */
+        .btn-side { font-size: 0.7rem; text-transform: uppercase; }
+        .btn-pause { background: var(--pause); }
+        .btn-quit { background: var(--accent); }
+
+        /* Posicionamento dos botões na grade de 5 colunas */
+        .pos-pause { grid-column: 1 / 2; grid-row: 2; } /* Esquerda central */
+        .pos-up { grid-column: 3; grid-row: 1; } /* Topo central */
+        .pos-left { grid-column: 2; grid-row: 2; } /* Esquerda perto da seta */
+        .pos-down { grid-column: 3; grid-row: 3; } /* Baixo central */
+        .pos-right { grid-column: 4; grid-row: 2; } /* Direita perto da seta */
+        .pos-quit { grid-column: 5 / 6; grid-row: 2; } /* Direita central */
+
+        #game-area { flex-grow: 1; display: flex; align-items: center; justify-content: center; background: #0b0f19; overflow: hidden; }
+        canvas { background: var(--path); border-radius: 8px; max-width: 98%; max-height: 98%; object-fit: contain; }
+        
+        /* AJUSTES ESPECÍFICOS PARA CELULAR */
+        @media (max-width: 800px) {
+            #app { flex-direction: column-reverse; }
+            #sidebar { 
+                width: 100%; 
+                height: 48%; /* Altura fixa para o painel inferior */
+                padding: 10px;
+                flex-direction: column; /* Volta a empilhar elementos no celular */
+                justify-content: flex-start;
+                overflow: hidden; /* Evita scroll indesejado na sidebar inteira */
+            }
+            #game-area { height: 52%; }
+            .medals-shelf { grid-template-columns: repeat(10, 1fr); padding: 5px; gap: 2px;} /* Estica medalhas */
+            .medal-icon {font-size: 1rem;}
+            .info-box {font-size: 0.65rem; padding: 3px;}
+            
+            /* Ajusta tamanho dos botões no celular para caberem todos */
+            .controls-group {
+                grid-template-rows: repeat(3, 42px); /* Botões mais baixos */
+                gap: 5px;
+            }
+            .btn-control { font-size: 1.2rem; }
+            .btn-side { font-size: 0.6rem; padding: 0 2px; } /* Texto menor para não quebrar */
+        }
+    </style>
+</head>
+<body>
+
+<div id="app">
+    <div id="sidebar">
+        
+<div class="header-panel">
+            <h3 class="header-title">IK BOT 🤖</h3>
+            <div class="level-label">Nível <span id="lvl-num">1</span></div>
+        </div>
+
+        
+<div class="info-container">
+            <div class="info-box">💀 <span id="crash-count">0</span></div>
+            <div class="info-box">⏱️ <span id="timer">00:00</span></div>
+        </div>
+
+        
+<div class="medals-shelf" id="shelf">
+            <span class="medal-icon" id="m1">🥉</span>
+            <span class="medal-icon" id="m2">🥉</span>
+            <span class="medal-icon" id="m3">🥉</span>
+            <span class="medal-icon" id="m4">🥈</span>
+            <span class="medal-icon" id="m5">🥈</span>
+            <span class="medal-icon" id="m6">🥈</span>
+            <span class="medal-icon" id="m7">🥈</span>
+            <span class="medal-icon" id="m8">🥇</span>
+            <span class="medal-icon" id="m9">🥇</span>
+            <span class="medal-icon" id="m10">💎</span>
+        </div>
+
+        
+<div class="controls-group">
+            
+<button id="pause-btn" class="btn-side btn-pause pos-pause" onclick="togglePause()">Pausar</button>
+            
+            
+<button class="btn-control pos-up" onpointerdown="changeDir('up')">↑</button>
+            <button class="btn-control pos-left" onpointerdown="changeDir('left')">←</button>
+            <button class="btn-control pos-down" onpointerdown="changeDir('down')">↓</button>
+            <button class="btn-control pos-right" onpointerdown="changeDir('right')">→</button>
+            
+            
+<button class="btn-side btn-quit pos-quit" onclick="desistir()">Desistir</button>
+        </div>
+    </div>
+
+    <div id="game-area">
+        <canvas id="stage"></canvas>
+    </div>
+</div>
+
+<script>
+    const canvas = document.getElementById('stage');
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    canvas.width = 1000; canvas.height = 800;
+
+    let currentLevel = 1;
+    let crashes = 0;
+    let seconds = 0;
+    let isPaused = false;
+    let isGamePaused = false;
+    let medalFloatingY = 0;
+    
+    const bot = { x: 0, y: 0, size: 28, speed: 3, dir: 'right', color: '#06b6d4' };
+
+    const levels = [
+        null,
+        { start: {x:60, y:60}, finish: {x:900, y:700}, medal: '🥉', walls: [[250, 0, 70, 600], [600, 200, 70, 600]] },
+        { start: {x:60, y:60}, finish: {x:900, y:60}, medal: '🥉', walls: [[0, 250, 800, 70], [200, 500, 800, 70]] },
+        { start: {x:60, y:700}, finish: {x:900, y:60}, medal: '🥉', walls: [[300, 150, 70, 650], [600, 0, 70, 650]] },
+        { start: {x:80, y:80}, finish: {x:500, y:400}, medal: '🥈', walls: [[250, 250, 500, 50], [250, 250, 50, 300]] },
+        { start: {x:60, y:60}, finish: {x:920, y:720}, medal: '🥈', walls: [[180, 0, 60, 650], [400, 150, 60, 650], [620, 0, 60, 650]] },
+        { start: {x:60, y:60}, finish: {x:60, y:720}, medal: '🥈', walls: [[0, 180, 850, 50], [150, 360, 850, 50]] },
+        { start: {x:60, y:60}, finish: {x:900, y:700}, medal: '🥈', walls: [[220, 0, 50, 350], [480, 100, 50, 600]] },
+        { start: {x:60, y:720}, finish: {x:900, y:720}, medal: '🥇', walls: [[150, 100, 40, 700], [550, 100, 40, 700]] },
+        { start: {x:60, y:720}, finish: {x:900, y:60}, medal: '🥇', walls: [[0, 580, 850, 40], [0, 220, 850, 40]] },
+        { start: {x:60, y:60}, finish: {x:900, y:700}, medal: '💎', walls: [[0, 180, 850, 50], [150, 380, 850, 50], [0, 580, 850, 50]] }
+    ];
+
+    function togglePause() {
+        isGamePaused = !isGamePaused;
+        document.getElementById('pause-btn').innerText = isGamePaused ? "Retomar" : "Pausar";
+    }
+
+    function changeDir(d) {
+        if(isPaused || isGamePaused) return;
+        bot.dir = d;
+    }
+
+    function desistir() {
+        if(confirm("Deseja mesmo desistir? Todo o seu progresso de medalhas será perdido e você voltará ao Nível 1.")) {
+            for(let i=1; i<=10; i++) {
+                document.getElementById(`m${i}`).classList.remove('earned');
+            }
+            currentLevel = 1;
+            document.getElementById('lvl-num').innerText = currentLevel;
+            bot.speed = 3;
+            crashes = 0;
+            seconds = 0;
+            document.getElementById('crash-count').innerText = "0";
+            resetPos();
+        }
+    }
+
+    function resetPos() {
+        isPaused = true;
+        bot.x = levels[currentLevel].start.x;
+        bot.y = levels[currentLevel].start.y;
+        bot.dir = levels[currentLevel].initDir || 'right';
+        setTimeout(() => isPaused = false, 600);
+    }
+
+    function render() {
+        ctx.fillStyle = "#334155"; ctx.fillRect(0, 0, canvas.width, canvas.height);
+        const lvl = levels[currentLevel];
+
+        ctx.fillStyle = "#f97316";
+        ctx.fillRect(0,0,1000,15); ctx.fillRect(0,785,1000,15);
+        ctx.fillRect(0,0,15,800); ctx.fillRect(985,0,15,800);
+        lvl.walls.forEach(w => ctx.fillRect(...w));
+
+        ctx.fillStyle = "#10b981"; ctx.fillRect(lvl.finish.x, lvl.finish.y, 55, 55);
+        
+        medalFloatingY = Math.sin(Date.now() / 200) * 8;
+        ctx.font = "40px Arial"; ctx.textAlign = "center";
+        ctx.fillText(lvl.medal, lvl.finish.x + 28, lvl.finish.y + 42 + medalFloatingY);
+
+        if(!isPaused && !isGamePaused) {
+            if (bot.dir === 'up') bot.y -= bot.speed;
+            if (bot.dir === 'down') bot.y += bot.speed;
+            if (bot.dir === 'left') bot.x -= bot.speed;
+            if (bot.dir === 'right') bot.x += bot.speed;
+            checkCollision();
+        }
+
+        ctx.fillStyle = bot.color; ctx.fillRect(bot.x, bot.y, bot.size, bot.size);
+        ctx.fillStyle = "white"; ctx.fillRect(bot.x+5, bot.y+5, bot.size-10, 5);
+
+        if(isGamePaused) {
+            ctx.fillStyle = "rgba(0,0,0,0.6)"; ctx.fillRect(0,0,1000,800);
+            ctx.fillStyle = "white"; ctx.font = "bold 60px Arial"; ctx.fillText("JOGO PAUSADO", 500, 420);
+        }
+        requestAnimationFrame(render);
+    }
+
+    function checkCollision() {
+        const lvl = levels[currentLevel];
+        const pts = [[bot.x, bot.y], [bot.x+bot.size, bot.y], [bot.x, bot.y+bot.size], [bot.x+bot.size, bot.y+bot.size]];
+        
+        for (let p of pts) {
+            const pix = ctx.getImageData(p[0], p[1], 1, 1).data;
+            if (pix[0] === 249 && pix[1] === 115) { 
+                crashes++; document.getElementById('crash-count').innerText = crashes;
+                resetPos(); return;
+            }
+        }
+
+        if (Math.abs(bot.x - lvl.finish.x) < 40 && Math.abs(bot.y - lvl.finish.y) < 40) {
+            document.getElementById(`m${currentLevel}`).classList.add('earned');
+            
+            if (currentLevel < 10) {
+                currentLevel++; 
+                document.getElementById('lvl-num').innerText = currentLevel;
+                bot.speed += 0.4;
+                resetPos();
+            } else { 
+                alert("INCRÍVEL! VOCÊ CONQUISTOU TODAS AS MEDALHAS!"); 
+                location.reload(); 
+            }
+        }
+    }
+
+    setInterval(() => { 
+        if(!isPaused && !isGamePaused) {
+            seconds++; 
+            const timerDisplay = document.getElementById('timer');
+            let m = Math.floor(seconds/60).toString().padStart(2,'0');
+            let s = (seconds%60).toString().padStart(2,'0');
+            timerDisplay.innerText = `${m}:${s}`;
+        }
+    }, 1000);
+
+    resetPos(); 
+    render();
+</script>
+</body>
+</html>
