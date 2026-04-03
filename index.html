@@ -3,285 +3,207 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>IK Bot - Evolution</title>
+    <title>IK Bot - Fixed Path Edition</title>
     <style>
-        :root {
-            --bg-dark: #0f172a; --panel-bg: #1e293b; --accent: #ef4444;
-            --path: #334155; --robot-body: #06b6d4; --wall: #f97316;
-            --finish: #10b981; --pause: #3b82f6;
-        }
+        :root { --gold: #fbbf24; --finish: #10b981; --accent: #ef4444; }
+        #desktop-lock { display: none; position: fixed; inset: 0; background: #000; z-index: 10000; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 30px; }
+        @media (min-width: 1025px) { #desktop-lock { display: flex; } }
 
-        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; outline: none; }
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; user-select: none; margin: 0; padding: 0; }
+        body { width: 100%; height: 100dvh; font-family: sans-serif; background: #000; color: white; overflow: hidden; touch-action: none; }
+        #app { display: flex; width: 100%; height: 100%; flex-direction: column-reverse; }
         
-        html, body { 
-            margin: 0; padding: 0; width: 100%; height: 100%;
-            font-family: 'Segoe UI', sans-serif; 
-            background: var(--bg-dark); color: white;
-            display: flex; overflow: hidden; touch-action: none;
-        }
+        #sidebar { background: #0a0a0a; display: flex; flex-direction: column; padding: 10px; gap: 8px; z-index: 10; border-top: 2px solid #334155; height: 40%; }
+        .header-panel { display: flex; justify-content: space-between; align-items: center; }
+        .level-label { background: var(--finish); border-radius: 8px; padding: 4px 12px; font-weight: bold; color: #000; font-size: 0.8rem; }
 
-        #app { display: flex; width: 100%; height: 100%; }
+        .stats-row { display: flex; gap: 8px; }
+        .info-box { background: #111; padding: 6px; border-radius: 5px; flex: 1; text-align: center; border: 1px solid #222; font-size: 0.8rem; }
+
+        .controls-grid { display: grid; grid-template-columns: repeat(5, 1fr); grid-template-rows: repeat(3, 1fr); gap: 10px; flex: 1; max-width: 400px; margin: 0 auto; width: 100%; }
+        .btn { border: none; border-radius: 12px; color: white; font-weight: bold; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 0 #000; cursor: pointer; }
+        .btn:active { transform: translateY(3px); box-shadow: none; filter: brightness(1.3); }
+        .btn-dir { background: #1e293b; font-size: 1.6rem; }
+        .btn-pause { background: #3b82f6; grid-column: 1; grid-row: 2; }
+        .btn-quit { background: var(--accent); grid-column: 5; grid-row: 2; }
         
-        #sidebar {
-            width: 300px; background: var(--panel-bg);
-            display: flex; flex-direction: column; padding: 15px;
-            gap: 10px; align-items: center;
-            box-shadow: 10px 0 20px rgba(0,0,0,0.5); z-index: 10;
-        }
+        #game-area { flex: 1; position: relative; display: flex; align-items: center; justify-content: center; }
+        canvas { max-width: 100%; max-height: 100%; object-fit: contain; background: #000; }
 
-        .header-panel { text-align: center; width: 100%; }
-        .header-title { margin: 0; color: var(--robot-body); font-size: 1.1rem; }
-        .level-label { background: var(--finish); border-radius: 15px; padding: 2px 10px; font-size: 0.8rem; font-weight: bold; margin: 5px 0; display: inline-block; }
-
-        .info-container { display: flex; justify-content: space-between; width: 100%; gap: 5px; }
-        .info-box { background: #000; padding: 5px; border-radius: 5px; font-size: 0.7rem; text-align: center; flex: 1; border: 1px solid #334155; }
-        
-        .medals-shelf {
-            display: grid; grid-template-columns: repeat(5, 1fr);
-            gap: 4px; background: rgba(0,0,0,0.4); padding: 8px;
-            border-radius: 10px; width: 100%; border: 1px solid #334155;
-        }
-        .medal-icon { font-size: 1.1rem; filter: grayscale(1); opacity: 0.15; transition: 0.5s; text-align: center; }
-        .medal-icon.earned { filter: grayscale(0); opacity: 1; transform: scale(1.1); }
-
-        .controls-group {
-            display: grid;
-            grid-template-columns: repeat(5, 1fr);
-            grid-template-rows: repeat(3, 48px);
-            gap: 8px;
-            width: 100%;
-            margin-top: auto;
-            padding-bottom: 5px;
-        }
-
-        .btn-control, .btn-side {
-            border: none; border-radius: 10px; color: white;
-            cursor: pointer; box-shadow: 0 4px 0 rgba(0,0,0,0.4);
-            display: flex; align-items: center; justify-content: center;
-            font-weight: bold; transition: all 0.1s;
-            height: 100%; width: 100%;
-        }
-        .btn-control:active, .btn-side:active { transform: translateY(3px); box-shadow: none; }
-        .btn-control { background: #475569; font-size: 1.3rem; }
-        .btn-control:active { background: var(--robot-body); }
-        .btn-side { font-size: 0.7rem; text-transform: uppercase; }
-        .btn-pause { background: var(--pause); }
-        .btn-quit { background: var(--accent); }
-
-        .pos-pause { grid-column: 1 / 2; grid-row: 2; }
-        .pos-up { grid-column: 3; grid-row: 1; }
-        .pos-left { grid-column: 2; grid-row: 2; }
-        .pos-down { grid-column: 3; grid-row: 3; }
-        .pos-right { grid-column: 4; grid-row: 2; }
-        .pos-quit { grid-column: 5 / 6; grid-row: 2; }
-
-        #game-area { flex-grow: 1; display: flex; align-items: center; justify-content: center; background: #0b0f19; overflow: hidden; }
-        canvas { background: var(--path); border-radius: 8px; max-width: 98%; max-height: 98%; object-fit: contain; }
-        
-        @media (max-width: 800px) {
-            #app { flex-direction: column-reverse; }
-            #sidebar { width: 100%; height: 45%; padding: 10px; }
-            #game-area { height: 55%; }
-            .medals-shelf { grid-template-columns: repeat(10, 1fr); }
-            .controls-group { grid-template-rows: repeat(3, 40px); }
-        }
+        #victory-modal { display: none; position: absolute; inset: 0; background: rgba(0,0,0,0.9); z-index: 500; flex-direction: column; align-items: center; justify-content: center; }
     </style>
 </head>
 <body>
 
-<div id="app">
-    <div id="sidebar">
-        <div class="header-panel">
-            <h3 class="header-title">IK BOT 🤖</h3>
-            <div class="level-label">Nível <span id="lvl-num">1</span> <span id="cycle-label" style="color:yellow"></span></div>
-        </div>
-
-        <div class="info-container">
-            <div class="info-box">💀 <span id="crash-count">0</span></div>
-            <div class="info-box">⏱️ <span id="timer">00:00</span></div>
-        </div>
-
-        <div class="medals-shelf" id="shelf">
-            <span class="medal-icon" id="m1">🥉</span><span class="medal-icon" id="m2">🥉</span>
-            <span class="medal-icon" id="m3">🥉</span><span class="medal-icon" id="m4">🥈</span>
-            <span class="medal-icon" id="m5">🥈</span><span class="medal-icon" id="m6">🥈</span>
-            <span class="medal-icon" id="m7">🥈</span><span class="medal-icon" id="m8">🥇</span>
-            <span class="medal-icon" id="m9">🥇</span><span class="medal-icon" id="m10">💎</span>
-        </div>
-
-        <div class="controls-group">
-            <button id="pause-btn" class="btn-side btn-pause pos-pause" onclick="togglePause()">Pausar</button>
-            <button class="btn-control pos-up" onpointerdown="changeDir('up')">↑</button>
-            <button class="btn-control pos-left" onpointerdown="changeDir('left')">←</button>
-            <button class="btn-control pos-down" onpointerdown="changeDir('down')">↓</button>
-            <button class="btn-control pos-right" onpointerdown="changeDir('right')">→</button>
-            <button class="btn-side btn-quit pos-quit" onclick="desistir()">Sair</button>
-        </div>
+    <div id="desktop-lock">
+        <h1 style="color: var(--gold);">ACESSO MOBILE</h1>
+        <p>Incompatível com Desktop.</p>
     </div>
 
-    <div id="game-area">
-        <canvas id="stage"></canvas>
+    <div id="app">
+        <div id="sidebar">
+            <div class="header-panel">
+                <div class="level-label" id="lvl-tag">SETOR 1</div>
+                <div id="cycle-label" style="color: var(--gold); font-weight: bold;"></div>
+            </div>
+            <div class="stats-row">
+                <div class="info-box">🏅 <span id="medal-val">0</span></div>
+                <div class="info-box">💥 <span id="crash-count">0</span></div>
+                <div class="info-box">⚡ <span id="spd-val">5</span></div>
+            </div>
+            <div class="controls-grid">
+                <button class="btn btn-pause" id="btn-p">II</button>
+                <button class="btn btn-dir" style="grid-column: 3; grid-row: 1;" onpointerdown="changeDir('up')">▲</button>
+                <button class="btn btn-dir" style="grid-column: 2; grid-row: 2;" onpointerdown="changeDir('left')">◀</button>
+                <button class="btn btn-dir" style="grid-column: 3; grid-row: 3;" onpointerdown="changeDir('down')">▼</button>
+                <button class="btn btn-dir" style="grid-column: 4; grid-row: 2;" onpointerdown="changeDir('right')">▶</button>
+                <button class="btn btn-quit" id="btn-r">R</button>
+            </div>
+        </div>
+
+        <div id="game-area">
+            <canvas id="stage"></canvas>
+            <div id="victory-modal">
+                <div style="background:#111; border:2px solid var(--gold); padding:30px; border-radius:20px; text-align:center;">
+                    <h2 style="color:var(--gold)">CICLO COMPLETO</h2>
+                    <button class="btn" style="background:var(--gold); color:#000; padding:15px 30px; margin-top:20px;" onclick="confirmVictory()">AVANÇAR</button>
+                </div>
+            </div>
+        </div>
     </div>
-</div>
 
 <script>
     const canvas = document.getElementById('stage');
-    const ctx = canvas.getContext('2d', { willReadFrequently: true });
-    canvas.width = 1000; canvas.height = 800;
+    const ctx = canvas.getContext('2d');
+    canvas.width = 800; canvas.height = 800;
 
-    let currentLevel = 1;
-    let cycle = 1; // Contador de quantas vezes completou o jogo
-    let crashes = 0;
-    let seconds = 0;
-    let isPaused = false;
-    let isGamePaused = false;
-    let medalFloatingY = 0;
-    let isMirrored = false; // Alterna o formato do mapa
-    
-    const bot = { x: 0, y: 0, size: 28, speed: 3.5, dir: 'right', color: '#06b6d4' };
+    let state = { lvl: 1, cycle: 1, crashes: 0, medals: 0, walls: [], isPaused: false, isGamePaused: false, isVictory: false, theme: {bg:'#0f172a', w:'#38bdf8'} };
+    const bot = { x: 60, y: 60, size: 36, speed: 5, dir: 'right', visual: '🤖' };
+    const goal = { x: 700, y: 700 };
 
-    const levels = [
-        null,
-        { start: {x:60, y:60}, finish: {x:900, y:700}, medal: '🥉', walls: [[250, 0, 70, 600], [600, 200, 70, 600]] },
-        { start: {x:60, y:60}, finish: {x:900, y:60}, medal: '🥉', walls: [[0, 250, 800, 70], [200, 500, 800, 70]] },
-        { start: {x:60, y:700}, finish: {x:900, y:60}, medal: '🥉', walls: [[300, 150, 70, 650], [600, 0, 70, 650]] },
-        { start: {x:80, y:80}, finish: {x:500, y:400}, medal: '🥈', walls: [[250, 250, 500, 50], [250, 250, 50, 300]] },
-        { start: {x:60, y:60}, finish: {x:920, y:720}, medal: '🥈', walls: [[180, 0, 60, 650], [400, 150, 60, 650], [620, 0, 60, 650]] },
-        { start: {x:60, y:60}, finish: {x:60, y:720}, medal: '🥈', walls: [[0, 180, 850, 50], [150, 360, 850, 50]] },
-        { start: {x:60, y:60}, finish: {x:900, y:700}, medal: '🥈', walls: [[220, 0, 50, 350], [480, 100, 50, 600]] },
-        { start: {x:60, y:720}, finish: {x:900, y:720}, medal: '🥇', walls: [[150, 100, 40, 700], [550, 100, 40, 700]] },
-        { start: {x:60, y:720}, finish: {x:900, y:60}, medal: '🥇', walls: [[0, 580, 850, 40], [0, 220, 850, 40]] },
-        { start: {x:60, y:60}, finish: {x:900, y:700}, medal: '💎', walls: [[0, 180, 850, 50], [150, 380, 850, 50], [0, 580, 850, 50]] }
-    ];
-
-    function togglePause() {
-        isGamePaused = !isGamePaused;
-        document.getElementById('pause-btn').innerText = isGamePaused ? "Retomar" : "Pausar";
+    function playSound(f, d) {
+        try {
+            const ac = new (window.AudioContext || window.webkitAudioContext)();
+            const o = ac.createOscillator(); const g = ac.createGain();
+            o.frequency.value = f; g.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + d);
+            o.connect(g); g.connect(ac.destination); o.start(); o.stop(ac.currentTime + d);
+        } catch(e){}
     }
 
-    function changeDir(d) {
-        if(isPaused || isGamePaused) return;
-        bot.dir = d;
-    }
+    // NOVA LÓGICA: Gera labirinto garantindo que áreas do bot e da bandeira fiquem limpas
+    function generateSafeMaze() {
+        state.walls = [];
+        const numBars = 8 + (state.lvl * 2);
+        
+        for(let i=0; i<numBars; i++) {
+            const isVert = Math.random() > 0.5;
+            const w = isVert ? 30 : 100 + Math.random() * 200;
+            const h = isVert ? 100 + Math.random() * 200 : 30;
+            const x = 50 + Math.random() * 650;
+            const y = 50 + Math.random() * 650;
 
-    function desistir() {
-        if(confirm("Reiniciar tudo?")) {
-            location.reload();
+            // Bloqueia criação de parede se estiver na "Safe Zone" do Bot (Início)
+            if (x < 150 && y < 150) continue;
+            // Bloqueia criação de parede se estiver na "Safe Zone" da Bandeira (Fim)
+            if (x + w > 600 && y + h > 600) continue;
+
+            state.walls.push({x, y, w, h});
         }
     }
+
+    function updateTheme() {
+        const themes = [
+            {bg: '#0f172a', w: '#38bdf8', b: '🤖'},
+            {bg: '#1e1b4b', w: '#818cf8', b: '🦾'},
+            {bg: '#2d0b36', w: '#f472b6', b: '⚡'},
+            {bg: '#050505', w: '#39ff14', b: '🛸'}
+        ];
+        state.theme = themes[state.lvl % themes.length];
+        bot.visual = state.theme.b;
+        document.getElementById('lvl-tag').innerText = `SETOR ${state.lvl}`;
+        document.getElementById('spd-val').innerText = bot.speed;
+        document.getElementById('cycle-label').innerText = `C-${state.cycle}`;
+    }
+
+    function changeDir(d) { if(!state.isGamePaused) bot.dir = d; }
 
     function resetPos() {
-        isPaused = true;
-        const lvl = levels[currentLevel];
-        
-        // Se estiver espelhado, inverte a posição X inicial
-        bot.x = isMirrored ? (1000 - lvl.start.x - bot.size) : lvl.start.x;
-        bot.y = lvl.start.y;
-        bot.dir = isMirrored ? (lvl.initDir === 'right' ? 'left' : 'left') : 'right';
-        
-        setTimeout(() => isPaused = false, 500);
+        bot.x = 60; bot.y = 60; bot.dir = 'right';
+        state.isPaused = true;
+        setTimeout(() => state.isPaused = false, 500);
     }
+
+    document.getElementById('btn-r').onclick = () => location.reload();
+    document.getElementById('btn-p').onclick = () => {
+        state.isGamePaused = !state.isGamePaused;
+        document.getElementById('btn-p').innerText = state.isGamePaused ? '▶' : 'II';
+    };
 
     function render() {
-        ctx.fillStyle = "#334155"; ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = state.theme.bg; ctx.fillRect(0, 0, 800, 800);
         
-        const lvl = levels[currentLevel];
-
-        ctx.fillStyle = "#f97316"; // Cor das paredes
         // Bordas
-        ctx.fillRect(0,0,1000,15); ctx.fillRect(0,785,1000,15);
-        ctx.fillRect(0,0,15,800); ctx.fillRect(985,0,15,800);
-
-        // Desenha paredes com lógica de espelhamento
-        lvl.walls.forEach(w => {
-            let wx = isMirrored ? (1000 - w[0] - w[2]) : w[0];
-            ctx.fillRect(wx, w[1], w[2], w[3]);
-        });
-
-        // Chegada
-        let fx = isMirrored ? (1000 - lvl.finish.x - 55) : lvl.finish.x;
-        ctx.fillStyle = "#10b981"; ctx.fillRect(fx, lvl.finish.y, 55, 55);
+        ctx.fillStyle = state.theme.w;
+        ctx.fillRect(0,0,800,15); ctx.fillRect(0,785,800,15);
+        ctx.fillRect(0,0,15,800); ctx.fillRect(785,0,15,800);
         
-        medalFloatingY = Math.sin(Date.now() / 200) * 8;
-        ctx.font = "40px Arial"; ctx.textAlign = "center";
-        ctx.fillText(lvl.medal, fx + 28, lvl.finish.y + 42 + medalFloatingY);
+        // Paredes
+        state.walls.forEach(w => ctx.fillRect(w.x, w.y, w.w, w.h));
 
-        if(!isPaused && !isGamePaused) {
-            if (bot.dir === 'up') bot.y -= bot.speed;
-            if (bot.dir === 'down') bot.y += bot.speed;
-            if (bot.dir === 'left') bot.x -= bot.speed;
-            if (bot.dir === 'right') bot.x += bot.speed;
-            checkCollision(fx, lvl.finish.y);
-        }
+        // Meta (Sempre visível e acessível)
+        ctx.fillStyle = "#10b981"; ctx.fillRect(goal.x, goal.y, 65, 65);
+        ctx.font = "30px Arial"; ctx.fillText("🏁", goal.x + 12, goal.y + 45);
 
-        // Desenha Bot
-        ctx.fillStyle = bot.color; ctx.fillRect(bot.x, bot.y, bot.size, bot.size);
-        ctx.fillStyle = "white"; ctx.fillRect(bot.x+5, bot.y+5, bot.size-10, 5);
+        if(!state.isGamePaused && !state.isVictory && !state.isPaused) {
+            if(bot.dir === 'up') bot.y -= bot.speed;
+            if(bot.dir === 'down') bot.y += bot.speed;
+            if(bot.dir === 'left') bot.x -= bot.speed;
+            if(bot.dir === 'right') bot.x += bot.speed;
 
-        if(isGamePaused) {
-            ctx.fillStyle = "rgba(0,0,0,0.6)"; ctx.fillRect(0,0,1000,800);
-            ctx.fillStyle = "white"; ctx.font = "bold 60px Arial"; ctx.textAlign="center"; ctx.fillText("JOGO PAUSADO", 500, 420);
-        }
-        requestAnimationFrame(render);
-    }
+            // Colisões
+            let hit = (bot.x < 15 || bot.x > 785 - bot.size || bot.y < 15 || bot.y > 785 - bot.size);
+            state.walls.forEach(w => {
+                if(bot.x < w.x + w.w && bot.x + bot.size > w.x && bot.y < w.y + w.h && bot.y + bot.size > w.y) hit = true;
+            });
 
-    function checkCollision(finishX, finishY) {
-        // Colisão com paredes (cor laranja)
-        const pts = [[bot.x, bot.y], [bot.x+bot.size, bot.y], [bot.x, bot.y+bot.size], [bot.x+bot.size, bot.y+bot.size]];
-        for (let p of pts) {
-            const pix = ctx.getImageData(p[0], p[1], 1, 1).data;
-            if (pix[0] === 249 && pix[1] === 115) { 
-                crashes++; document.getElementById('crash-count').innerText = crashes;
-                resetPos(); return;
+            if(hit) {
+                playSound(150, 0.2);
+                state.crashes++;
+                document.getElementById('crash-count').innerText = state.crashes;
+                if(state.medals > 0) {
+                    state.medals--;
+                    document.getElementById('medal-val').innerText = state.medals;
+                }
+                resetPos();
+            }
+
+            // Vitória no Setor
+            if(bot.x > 660 && bot.y > 660) {
+                playSound(600, 0.2);
+                state.medals++;
+                document.getElementById('medal-val').innerText = state.medals;
+                if(state.lvl < 5) {
+                    state.lvl++; bot.speed += 0.5;
+                    generateSafeMaze(); updateTheme(); resetPos();
+                } else {
+                    state.isVictory = true;
+                    document.getElementById('victory-modal').style.display = 'flex';
+                }
             }
         }
 
-        // Vitória no nível
-        if (Math.abs(bot.x - finishX) < 40 && Math.abs(bot.y - finishY) < 40) {
-            document.getElementById(`m${currentLevel}`).classList.add('earned');
-            isPaused = true; // Trava o bot antes do alerta
-
-            // Pequeno delay para o navegador renderizar o bot chegando antes do alerta
-            setTimeout(() => {
-                if (currentLevel < 10) {
-                    currentLevel++; 
-                    document.getElementById('lvl-num').innerText = currentLevel;
-                    bot.speed += 0.4;
-                    resetPos();
-                } else { 
-                    alert("INCRÍVEL! VOCÊ CONQUISTOU TODAS AS MEDALHAS!\nDificuldade Aumentada: Nível Prestígio " + cycle); 
-                    startNewCycle();
-                }
-            }, 100);
-        }
+        ctx.font = "40px Arial"; ctx.fillText(bot.visual, bot.x, bot.y + 35);
+        requestAnimationFrame(render);
     }
 
-    function startNewCycle() {
-        cycle++;
-        currentLevel = 1;
-        isMirrored = !isMirrored; // Muda o formato do labirinto (espelha)
-        bot.speed = 3.5 + (cycle * 0.5); // Mais rápido a cada ciclo
-        
-        // Reseta visual das medalhas para o novo ciclo
-        for(let i=1; i<=10; i++) document.getElementById(`m${i}`).classList.remove('earned');
-        
-        document.getElementById('lvl-num').innerText = currentLevel;
-        document.getElementById('cycle-label').innerText = `(V${cycle})`;
-        resetPos();
+    function confirmVictory() {
+        state.cycle++; state.lvl = 1; bot.speed += 1;
+        state.isVictory = false;
+        document.getElementById('victory-modal').style.display = 'none';
+        generateSafeMaze(); updateTheme(); resetPos();
     }
 
-    setInterval(() => { 
-        if(!isPaused && !isGamePaused) {
-            seconds++; 
-            const timerDisplay = document.getElementById('timer');
-            let m = Math.floor(seconds/60).toString().padStart(2,'0');
-            let s = (seconds%60).toString().padStart(2,'0');
-            timerDisplay.innerText = `${m}:${s}`;
-        }
-    }, 1000);
-
-    resetPos(); 
-    render();
+    generateSafeMaze(); updateTheme(); resetPos(); render();
 </script>
 </body>
 </html>
